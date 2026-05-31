@@ -25,7 +25,7 @@ public class RabbitMQHandler {
         long deliveryTag = msg.getMessageProperties().getDeliveryTag();
         try {
             voucherOrderService.handleVoucherOrder(voucherOrderDTO);
-            channel.basicAck(deliveryTag, false);
+            channel.basicAck(deliveryTag, false); // ← 成功，确认删除
         } catch (Exception e) {
             log.error("订单处理异常 orderId={}", voucherOrderDTO.getId(), e);
             // 仅对临时性异常重试，最多3次
@@ -34,10 +34,10 @@ public class RabbitMQHandler {
                     : 0;
             if (retryCount < 3) {
                 msg.getMessageProperties().setHeader("retry-count", retryCount + 1);
-                channel.basicNack(deliveryTag, false, true);
+                channel.basicNack(deliveryTag, false, true);  // ← 重新入队，等下次消费
             } else {
                 channel.basicNack(deliveryTag, false, false);
-                log.error("订单处理重试耗尽，消息丢弃 orderId={}", voucherOrderDTO.getId());
+                log.error("订单处理重试耗尽，消息丢弃 orderId={}", voucherOrderDTO.getId());  // ← 拒绝，不重新入队（丢弃/死信）
             }
         }
     }

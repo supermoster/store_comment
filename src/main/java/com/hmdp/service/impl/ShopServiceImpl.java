@@ -5,7 +5,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
@@ -59,35 +58,34 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Override
     public Result queryById(Long id) {
-        // 缓存穿透
-//        Shop shop = cacheClient.queryPassThrough(
-//                RedisConstants.CACHE_SHOP_KEY, id, Shop.class, this::getById, RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+        String key = RedisConstants.CACHE_SHOP_KEY + id;
+        String jsonShop = stringRedisTemplate.opsForValue().get(key);
 
-        // 缓存击穿-互斥锁
-//        Shop shop = cacheClient.queryWithMute(RedisConstants.CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
-
-        // 1.获取当前用户
-        String jsonShop = stringRedisTemplate.opsForValue().get(RedisConstants.CACHE_SHOP_KEY + id);
-        if (StrUtil.isBlank(jsonShop)) {
-            // 查询店铺
-            Shop shop = getById(id);
-            jsonShop = JSONUtil.toJsonStr(shop);
-
-            // 创建缓存
-            cacheClient.setWithLogicalExpire(RedisConstants.CACHE_SHOP_KEY + id, jsonShop, 20L, TimeUnit.SECONDS);
-            return Result.ok(shop);
-        }
-
-        // 缓存击穿-逻辑过期
-        Shop shop = cacheClient.queryWithLogicalExpire(
-                RedisConstants.CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
-
-        // 判断是否为空
-        if (shop == null) {
+        // 1. 防穿透：命中了缓存的空值（之前查过，DB 不存在）
+        if ("".equals(jsonShop)) {
             return Result.fail("店铺不存在");
         }
 
-        // 返回数据
+        // 2. 缓存未命中，查 DB 并创建逻辑过期缓存
+        if (StrUtil.isBlank(jsonShop)) {
+            Shop shop = getById(id);
+            if (shop == null) {
+                // 缓存空值，防止穿透（下次请求直接返回"不存在"，不穿到 DB）
+                stringRedisTemplate.opsForValue().set(key, "", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+                return Result.fail("店铺不存在");
+            }
+            cacheClient.setWithLogicalExpire(key, shop, RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
+            return Result.ok(shop);
+        }
+
+        // 3. 缓存命中 → 逻辑过期防击穿（过期时互斥重建，旧数据兜底）
+        Shop shop = cacheClient.queryWithLogicalExpire(
+                RedisConstants.CACHE_SHOP_KEY, id, Shop.class, this::getById,
+                RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
+
+        if (shop == null) {
+            return Result.fail("店铺不存在");
+        }
         return Result.ok(shop);
     }
 

@@ -2,11 +2,14 @@ package com.hmdp.controller;
 
 
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.SystemConstants;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -19,6 +22,7 @@ import javax.annotation.Resource;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Slf4j
 @RestController
 @RequestMapping("/shop")
 public class ShopController {
@@ -32,8 +36,17 @@ public class ShopController {
      * @return 商铺详情数据
      */
     @GetMapping("/{id}")
+    @SentinelResource(value = "queryShopById", blockHandler = "queryShopByIdBlock")
     public Result queryShopById(@PathVariable("id") Long id) {
         return shopService.queryById(id);
+    }
+
+    /**
+     * 查询店铺限流兜底 — 返回降级提示
+     */
+    public Result queryShopByIdBlock(Long id, BlockException e) {
+        log.warn("查询店铺接口被限流, id={}", id);
+        return Result.fail("系统繁忙，请稍后再试");
     }
 
     /**
@@ -67,14 +80,22 @@ public class ShopController {
      * @return 商铺列表
      */
     @GetMapping("/of/type")
+    @SentinelResource(value = "queryShopByType", blockHandler = "queryShopByTypeBlock")
     public Result queryShopByType(
             @RequestParam("typeId") Integer typeId,
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "x", required = false) Double x,
             @RequestParam(value = "y", required = false) Double y
     ) {
-
         return shopService.queryShopByType(typeId, current, x, y);
+    }
+
+    /**
+     * 按类型查询限流兜底
+     */
+    public Result queryShopByTypeBlock(Integer typeId, Integer current, Double x, Double y, BlockException e) {
+        log.warn("按类型查询店铺被限流, typeId={}", typeId);
+        return Result.fail("系统繁忙，请稍后再试");
     }
 
     /**
