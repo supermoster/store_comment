@@ -18,6 +18,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PreDestroy;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.config.RabbitMQConfig.SECKILL_ORDER_EXCHANGE;
 import static com.hmdp.config.RabbitMQConfig.SECKILL_ORDER_ROUTING_KEY;
+import static com.hmdp.utils.RedisConstants.MQ_RETRY_ORDER_KEY;
 
 @Service
 @Slf4j
@@ -111,12 +113,60 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
                 log.error("MQ 异步发送失败, orderId={}", orderId, e);
                 // 写入 Redis 备份队列，定时任务补偿重发
                 stringRedisTemplate.opsForList().leftPush("mq:retry:orders",
-                        orderId + ":" + voucherId + ":" + userId);
+                        orderId + ":" + voucherId + ":" + userId + ":0");
             }
         });
 
         // 5. 立即返回
         return Result.ok(orderId);
+    }
+
+    /**
+     * 定时任务：补偿重发 Redis 备份队列中失败的 MQ 消息
+     * 每 10 秒扫描一次，批量弹出并重试，最多重试 3 次
+     */
+    @Scheduled(fixedDelay = 60_000)
+    public void retryMqFromRedis() {
+        String redisKey = MQ_RETRY_ORDER_KEY;
+        int batchSize = 100;
+        for (int i = 0; i < batchSize; i++) {
+            String entry = stringRedisTemplate.opsForList().rightPop(redisKey);
+            if (entry == null) {
+                // 队列已空
+                break;
+            }
+            // 格式: orderId:voucherId:userId:retryCount
+            String[] parts = entry.split(":");
+            if (parts.length != 4) {
+                log.warn("Redis 备份队列数据格式异常，跳过: {}", entry);
+                continue;
+            }
+            long orderId = Long.parseLong(parts[0]);
+            long voucherId = Long.parseLong(parts[1]);
+            long userId = Long.parseLong(parts[2]);
+            int retryCount = Integer.parseInt(parts[3]);
+
+            VoucherOrderDTO dto = new VoucherOrderDTO();
+            dto.setId(orderId);
+            dto.setVoucherId(voucherId);
+            dto.setUserId(userId);
+
+            try {
+                rabbitTemplate.convertAndSend(SECKILL_ORDER_EXCHANGE, SECKILL_ORDER_ROUTING_KEY, dto);
+                log.info("补偿重发 MQ 成功, orderId={}, retryCount={}", orderId, retryCount);
+            } catch (Exception e) {
+                retryCount++;
+                log.error("补偿重发 MQ 失败, orderId={}, retryCount={}", orderId, retryCount, e);
+                if (retryCount < 3) {
+                    // 未达上限，重新放回队列头部
+                    stringRedisTemplate.opsForList().leftPush(redisKey,
+                            orderId + ":" + voucherId + ":" + userId + ":" + retryCount);
+                } else {
+                    log.error("补偿重发 MQ 重试耗尽，消息丢弃, orderId={}, voucherId={}, userId={}",
+                            orderId, voucherId, userId);
+                }
+            }
+        }
     }
 
     @Transactional
