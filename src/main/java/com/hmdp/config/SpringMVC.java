@@ -23,7 +23,8 @@ public class SpringMVC implements WebMvcConfigurer {
                 "/shop/**",
                 "/shop-type/**",
                 "/upload/**",
-                "/voucher/**"
+                "/voucher/**",
+                "/voucher-order/**"  // 秒杀高并发路径，已在 RefreshTokenInterceptor 完成鉴权
         ).order(1);
 
         registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).order(0);

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -57,10 +58,11 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
 
-        // 保存秒杀券库存到Redis中-String
+        int time = voucher.getEndTime().getSecond() - voucher.getBeginTime().getSecond();
+        // 保存秒杀券库存到Redis中-String（带 TTL）
         stringRedisTemplates.opsForValue()
-                .set(RedisConstants.SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
-
+                .set(RedisConstants.SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString(),
+                        time, TimeUnit.SECONDS);
     }
 
 

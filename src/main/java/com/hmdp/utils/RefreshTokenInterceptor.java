@@ -8,11 +8,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
     public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
@@ -20,31 +20,30 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 获取token
         String token = request.getHeader("Authorization");
+        if (token == null || token.isEmpty()) {
+            return true;
+        }
 
-        // 从Redis中获取用户
         String tokenkey = RedisConstants.LOGIN_USER_KEY + token;
         Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(tokenkey);
 
-        // 用户不存在
         if (userMap.isEmpty()) {
             return true;
         }
-        // 将查询到的Hash数据转换成userDTO对象
         UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
-
-        // 保存用户到ThreadLocal中
         UserHolder.saveUser(userDTO);
 
-        // 刷新token有效期
-        stringRedisTemplate.expire(tokenkey, RedisConstants.LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(tokenkey, RedisConstants.LOGIN_USER_TTL, java.util.concurrent.TimeUnit.MINUTES);
 
         return true;
     }
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        UserHolder.removeUser();
+        // 秒杀路径不清理，避免与 LoginInterceptor 双重 remove
+        if (!request.getRequestURI().contains("/voucher-order/")) {
+            UserHolder.removeUser();
+        }
     }
 }

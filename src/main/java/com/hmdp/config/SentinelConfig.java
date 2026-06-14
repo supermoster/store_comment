@@ -42,6 +42,11 @@ public class SentinelConfig {
                 .setGrade(RuleConstant.FLOW_GRADE_QPS)
                 .setCount(30));
 
+        // 秒杀下单接口 — 单机 QPS 上限 2000（Tomcat 200线程 + Redis Lua ~1ms，实际压测后调优）
+        rules.add(new FlowRule("seckillVoucher")
+                .setGrade(RuleConstant.FLOW_GRADE_QPS)
+                .setCount(2000));
+
         FlowRuleManager.loadRules(rules);
     }
 }

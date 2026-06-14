@@ -1,5 +1,10 @@
 server:
   port: 8081
+  tomcat:
+    threads:
+      max: 500        # Tomcat 最大线程数（默认200，高并发下会排队）
+      min-spare: 50
+    accept-count: 800 # TCP accept 队列深度
 spring:
   application:
     name: hmdp
@@ -19,7 +24,7 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual  # 手动确认模式
-        prefetch: 100             # 增大预取数，减少网络往返
+        prefetch: 50             # 增大预取数，减少网络往返
         concurrency: 8            # 消费者并发数
         max-concurrency: 16       # 最大并发数
     publisher-confirm-type: correlated  # 发布者确认类型
@@ -34,17 +39,20 @@ spring:
     password: 123456
     lettuce:
       pool:
-        max-active: 60
-        max-idle: 30
-        min-idle: 1
+        enabled: true          # 显式开启连接池（必加，否则 pool 配置被忽略）
+        max-active: 200
+        max-idle: 100
+        min-idle: 20
         time-between-eviction-runs: 10s
+      shutdown-timeout: 100ms
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
   level:
-    com.hmdp: debug
+    com.hmdp: info      # 关闭 DEBUG，高并发下日志 IO 是巨大瓶颈
+    root: warn
 
 management: # 健康点检测
   endpoints:

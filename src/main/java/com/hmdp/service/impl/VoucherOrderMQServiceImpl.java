@@ -4,10 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.VoucherOrderDTO;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
+import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.hmdp.config.RabbitMQConfig.SECKILL_ORDER_EXCHANGE;
 import static com.hmdp.config.RabbitMQConfig.SECKILL_ORDER_ROUTING_KEY;
@@ -67,8 +71,23 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
 
     @PreDestroy
     public void shutdown() {
-        ASYNC_MQ_EXECUTOR.shutdown();
+        log.info("开始关闭 MQ 异步发送线程池... 队列中待处理任务: {}",
+                ASYNC_MQ_EXECUTOR.getQueue().size());
+        try {
+            if (!ASYNC_MQ_EXECUTOR.awaitTermination(10, TimeUnit.SECONDS)) {
+                log.warn("线程池未在 10s 内完成，强制关闭，剩余任务: {}",
+                        ASYNC_MQ_EXECUTOR.getQueue().size());
+                ASYNC_MQ_EXECUTOR.shutdownNow();
+            } else {
+                log.info("MQ 异步发送线程池已优雅关闭");
+            }
+        } catch (InterruptedException e) {
+            log.error("等待线程池关闭被中断", e);
+            ASYNC_MQ_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
+
 
     /**
      * 秒杀券下单
@@ -77,11 +96,11 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
      * 1. RedisIdWorker 批量预取ID，消除每次 Redis INCR 调用
      * 2. MQ 异步发送，消除 broker 确认的阻塞等待（~2ms）
      * 3. 异步失败时写入 Redis List 兜底，后续补偿
+     * 4. Redis Hash 缓存活动时间，快速校验有效期
      */
     @Override
     public Result secKillVoucher(Long voucherId) {
         Long userId = UserHolder.getUser().getId();
-
         // 1. 执行 Lua 脚本（Redis 原子校验 + 扣库存 + 标记用户）
         Long result = stringRedisTemplate.execute(SECKILL_SCRIPT,
                 Collections.emptyList(), voucherId.toString(), userId.toString());
@@ -107,12 +126,17 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
 
         // 4. 异步发送 MQ，不阻塞主线程
         ASYNC_MQ_EXECUTOR.submit(() -> {
+            long sendStart = System.currentTimeMillis();
             try {
                 rabbitTemplate.convertAndSend(SECKILL_ORDER_EXCHANGE, SECKILL_ORDER_ROUTING_KEY, dto);
+                long elapsed = System.currentTimeMillis() - sendStart;
+                if (elapsed > 50) {
+                    log.warn("MQ 发送耗时较长(非排队), orderId={}, elapsed={}ms", orderId, elapsed);
+                }
             } catch (Exception e) {
                 log.error("MQ 异步发送失败, orderId={}", orderId, e);
                 // 写入 Redis 备份队列，定时任务补偿重发
-                stringRedisTemplate.opsForList().leftPush("mq:retry:orders",
+                stringRedisTemplate.opsForList().leftPush(MQ_RETRY_ORDER_KEY,
                         orderId + ":" + voucherId + ":" + userId + ":0");
             }
         });
@@ -123,9 +147,9 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
 
     /**
      * 定时任务：补偿重发 Redis 备份队列中失败的 MQ 消息
-     * 每 10 秒扫描一次，批量弹出并重试，最多重试 3 次
+     * 每 30 秒扫描一次，批量弹出并重试，最多重试 3 次
      */
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = 30_000)
     public void retryMqFromRedis() {
         String redisKey = MQ_RETRY_ORDER_KEY;
         int batchSize = 100;

@@ -18,6 +18,7 @@ public class RedisConstants {
     public static final Long LOCK_ORDER_TTL = 10L;
 
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
+    public static final String SECKILL_INFO_KEY = "seckill:info:";   // Hash: begin_time, end_time
     public static final String BLOG_LIKED_KEY = "blog:liked:";
 
     public static final String FOLLOW_KEY = "follows:";
