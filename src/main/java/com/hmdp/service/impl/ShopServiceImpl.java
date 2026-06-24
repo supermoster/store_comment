@@ -77,7 +77,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             cacheClient.setWithLogicalExpire(key, shop, RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
             return Result.ok(shop);
         }
-
         // 3. 缓存命中 → 逻辑过期防击穿（过期时互斥重建，旧数据兜底）
         Shop shop = cacheClient.queryWithLogicalExpire(
                 RedisConstants.CACHE_SHOP_KEY, id, Shop.class, this::getById,

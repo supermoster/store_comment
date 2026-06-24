@@ -42,7 +42,8 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         // 秒杀路径不清理，避免与 LoginInterceptor 双重 remove
-        if (!request.getRequestURI().contains("/voucher-order/")) {
+        String uri = request.getRequestURI();
+        if (uri == null || !uri.contains("/voucher-order/")) {
             UserHolder.removeUser();
         }
     }

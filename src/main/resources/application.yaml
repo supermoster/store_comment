@@ -10,16 +10,16 @@ spring:
     name: hmdp
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
     hikari:
       maximum-pool-size: 50
   rabbitmq:
-    addresses: 192.168.150.100
-    port: 5672
-    username: rabbitmq
-    password: rabbitmq
+    addresses: ${RABBITMQ_HOST:192.168.150.100}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:rabbitmq}
+    password: ${RABBITMQ_PASSWORD:rabbitmq}
     virtual-host: /
     listener:
       simple:
@@ -34,9 +34,9 @@ spring:
         size: 50                  # 增大通道缓存数
 
   redis:
-    host: 192.168.150.100
-    port: 6379
-    password: 123456
+    host: ${REDIS_HOST:192.168.150.100}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:123456}
     lettuce:
       pool:
         enabled: true          # 显式开启连接池（必加，否则 pool 配置被忽略）

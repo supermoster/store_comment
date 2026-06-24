@@ -28,8 +28,10 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.hmdp.config.RabbitMQConfig.SECKILL_ORDER_EXCHANGE;
@@ -56,21 +58,26 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
         SECKILL_SCRIPT.setLocation(new ClassPathResource("seckill2.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
     }
+    
+
+    // 优雅停机标记，防止 @Scheduled 在关闭期间继续访问 Redis
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
     // 异步MQ发送线程池 — 核心4线程，最大8线程，有界队列 + CallerRunsPolicy 做背压
     private static final ThreadPoolExecutor ASYNC_MQ_EXECUTOR = new ThreadPoolExecutor(
             4, 8, 60L, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(5000),
             r -> {
-                Thread t = new Thread(r, "async-mq-sender");
-                t.setDaemon(true);
-                return t;
+                    Thread t = new Thread(r, "async-mq-sender");
+                    t.setDaemon(true);
+                    return t;
             },
             new ThreadPoolExecutor.CallerRunsPolicy()
     );
 
     @PreDestroy
     public void shutdown() {
+        shuttingDown.set(true);  // 先标记停机，阻止 @Scheduled 继续访问 Redis/MySQL
         log.info("开始关闭 MQ 异步发送线程池... 队列中待处理任务: {}",
                 ASYNC_MQ_EXECUTOR.getQueue().size());
         try {
@@ -151,10 +158,24 @@ VoucherOrderMQServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> 
      */
     @Scheduled(fixedDelay = 30_000)
     public void retryMqFromRedis() {
+        if (shuttingDown.get()) {
+            return;
+        }
         String redisKey = MQ_RETRY_ORDER_KEY;
         int batchSize = 100;
         for (int i = 0; i < batchSize; i++) {
-            String entry = stringRedisTemplate.opsForList().rightPop(redisKey);
+            String entry;
+            try {
+                entry = stringRedisTemplate.opsForList().rightPop(redisKey);
+            } catch (Exception e) {
+                // 关闭期间 Redis 连接可能中断，静默退出
+                if (shuttingDown.get()) {
+                    log.info("应用关闭中，停止 Redis 补偿扫描");
+                    return;
+                }
+                log.error("Redis rightPop 异常", e);
+                break;
+            }
             if (entry == null) {
                 // 队列已空
                 break;

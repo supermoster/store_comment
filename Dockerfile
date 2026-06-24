@@ -1,14 +1,24 @@
-# 使用 OpenJDK 8 作为基础镜像
-FROM openjdk:8-jdk-alpine
+# 使用 Eclipse Temurin JDK 8（替代已废弃的 openjdk）
+FROM eclipse-temurin:8-jdk-alpine
+
+# 安装 curl 供健康检查使用
+RUN apk add --no-cache curl
 
 # 设置工作目录
 WORKDIR /app
 
-# 复制打包后的 JAR 文件
-COPY target/hm-dianping-0.0.1-SNAPSHOT.jar app.jar
+# 复制打包后的 JAR（通配符避免版本号硬编码）
+COPY target/*.jar app.jar
 
 # 暴露端口
 EXPOSE 8081
 
+# JVM 参数（可通过环境变量覆盖）
+ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# 健康检查（利用 Spring Boot Actuator）
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
+
 # 启动命令
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT exec java ${JAVA_OPTS} -jar app.jar

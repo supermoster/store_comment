@@ -14,6 +14,7 @@ import org.yaml.snakeyaml.events.Event;
 import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -30,16 +31,19 @@ public class CacheClient {
     }
 
     public void set(String key, Object value, Long time, TimeUnit unit) {
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
-
+        // 缓存雪崩防护：在 TTL 基础上添加随机偏移（最多 20%），避免大量 key 同时过期
+        long actualTime = time + ThreadLocalRandom.current().nextLong(time / 5 + 1);
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), actualTime, unit);
     }
 
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
+        // 缓存雪崩防护：在逻辑过期时间上添加随机偏移（最多 20%），避免大量 key 同时逻辑过期
+        long actualSeconds = unit.toSeconds(time) + ThreadLocalRandom.current().nextLong(time / 5 + 1);
         RedisLogicalData redisLogicalData = new RedisLogicalData();
-        redisLogicalData.setExpireTime(LocalDateTime.now().plusSeconds(unit.toSeconds(time)));
+        redisLogicalData.setExpireTime(LocalDateTime.now().plusSeconds(actualSeconds));
         redisLogicalData.setData(value);
         // 写入Redis
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisLogicalData), time, unit);
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisLogicalData));
     }
 
     // 缓存穿透
@@ -120,7 +124,14 @@ public class CacheClient {
             String jsonStr = JSONUtil.toJsonStr(redisLogicalData.getData());
             // json转为Shop对象
             r = JSONUtil.toBean(jsonStr , type);
-            return r;
+
+            expireTime = redisLogicalData.getExpireTime();
+            flag = expireTime.isAfter(LocalDateTime.now());
+
+            if (flag) {
+                // 未过期，返回店铺信息
+                return r;
+            }
         }
         // 开启独立线程，用于重建缓存
         CACHE_REBUILD_EXECUTOR.submit(() -> {
