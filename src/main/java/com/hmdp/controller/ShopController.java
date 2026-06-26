@@ -9,6 +9,9 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.SystemConstants;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,12 +19,13 @@ import javax.annotation.Resource;
 
 /**
  * <p>
- * 前端控制器
+ * 商铺管理接口
  * </p>
  *
  * @author 虎哥
  * @since 2021-12-22
  */
+@Api(tags = "商铺管理")
 @Slf4j
 @RestController
 @RequestMapping("/shop")
@@ -35,9 +39,10 @@ public class ShopController {
      * @param id 商铺id
      * @return 商铺详情数据
      */
+    @ApiOperation("根据ID查询商铺详情 - 含缓存穿透/击穿/雪崩防护")
     @GetMapping("/{id}")
     @SentinelResource(value = "queryShopById", blockHandler = "queryShopByIdBlock")
-    public Result queryShopById(@PathVariable("id") Long id) {
+    public Result queryShopById(@ApiParam(value = "商铺ID", required = true) @PathVariable("id") Long id) {
         return shopService.queryById(id);
     }
 
@@ -54,8 +59,9 @@ public class ShopController {
      * @param shop 商铺数据
      * @return 商铺id
      */
+    @ApiOperation("新增商铺")
     @PostMapping
-    public Result saveShop(@RequestBody Shop shop) {
+    public Result saveShop(@ApiParam(value = "商铺信息", required = true) @RequestBody Shop shop) {
         // 写入数据库
         shopService.save(shop);
         // 返回店铺id
@@ -67,8 +73,9 @@ public class ShopController {
      * @param shop 商铺数据
      * @return 无
      */
+    @ApiOperation("更新商铺信息 - 同步更新数据库和Redis缓存")
     @PutMapping
-    public Result updateShop(@RequestBody Shop shop) {
+    public Result updateShop(@ApiParam(value = "商铺信息", required = true) @RequestBody Shop shop) {
 
         return shopService.updateShop(shop);
     }
@@ -77,15 +84,18 @@ public class ShopController {
      * 根据商铺类型分页查询商铺信息
      * @param typeId 商铺类型
      * @param current 页码
+     * @param x 用户经度（可选）
+     * @param y 用户纬度（可选）
      * @return 商铺列表
      */
+    @ApiOperation("按类型分页查询商铺列表 - 支持按距离排序")
     @GetMapping("/of/type")
     @SentinelResource(value = "queryShopByType", blockHandler = "queryShopByTypeBlock")
     public Result queryShopByType(
-            @RequestParam("typeId") Integer typeId,
-            @RequestParam(value = "current", defaultValue = "1") Integer current,
-            @RequestParam(value = "x", required = false) Double x,
-            @RequestParam(value = "y", required = false) Double y
+            @ApiParam(value = "商铺类型ID", required = true) @RequestParam("typeId") Integer typeId,
+            @ApiParam(value = "页码", defaultValue = "1") @RequestParam(value = "current", defaultValue = "1") Integer current,
+            @ApiParam(value = "用户经度", required = false) @RequestParam(value = "x", required = false) Double x,
+            @ApiParam(value = "用户纬度", required = false) @RequestParam(value = "y", required = false) Double y
     ) {
         return shopService.queryShopByType(typeId, current, x, y);
     }
@@ -104,10 +114,11 @@ public class ShopController {
      * @param current 页码
      * @return 商铺列表
      */
+    @ApiOperation("按名称关键字搜索商铺")
     @GetMapping("/of/name")
     public Result queryShopByName(
-            @RequestParam(value = "name", required = false) String name,
-            @RequestParam(value = "current", defaultValue = "1") Integer current
+            @ApiParam(value = "商铺名称关键字", required = false) @RequestParam(value = "name", required = false) String name,
+            @ApiParam(value = "页码", defaultValue = "1") @RequestParam(value = "current", defaultValue = "1") Integer current
     ) {
         // 根据类型分页查询
         Page<Shop> page = shopService.query()

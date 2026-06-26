@@ -20,7 +20,7 @@ public class RedissonConfig {
     public RedissonClient redissonClient(){
         // 配置类
         Config config = new Config();
-        config.useSingleServer().setAddress(REDISSON_CONFIG_PROD).setPassword(REDISSON_PASSWORD);
+        config.useSingleServer().setAddress(REDISSON_CONFIG_DEV).setPassword(REDISSON_PASSWORD);
 
         // 创建RedissonClient对象
         redissonClient = Redisson.create(config);

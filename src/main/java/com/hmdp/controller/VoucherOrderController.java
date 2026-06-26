@@ -5,6 +5,9 @@ import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.hmdp.dto.Result;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.service.IVoucherService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -12,12 +15,13 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * <p>
- *  前端控制器
+ *  秒杀订单接口
  * </p>
  *
  * @author 虎哥
  * @since 2021-12-22
  */
+@Api(tags = "秒杀订单管理")
 @RestController
 @RequestMapping("/voucher-order")
 public class VoucherOrderController {
@@ -39,9 +43,10 @@ public class VoucherOrderController {
      * @param voucherId
      * @return
      */
+    @ApiOperation("秒杀券下单 - 高并发抢购接口")
     @PostMapping("seckill/{id}")
     @SentinelResource(value = "seckillVoucher", blockHandler = "seckillBlockHandler")
-    public Result seckillVoucher(@PathVariable("id") Long voucherId) throws InterruptedException {
+    public Result seckillVoucher(@ApiParam(value = "秒杀券ID", required = true) @PathVariable("id") Long voucherId) throws InterruptedException {
         return iVoucherOrderService.secKillVoucher(voucherId);
     }
 
@@ -50,11 +55,13 @@ public class VoucherOrderController {
      * @param voucherId
      * @return
      */
+    @ApiOperation("普通优惠券下单")
     @PostMapping("/{voucherId}")
-    public Result voucher(@PathVariable("voucherId") Long voucherId) {
+    public Result voucher(@ApiParam(value = "优惠券ID", required = true) @PathVariable("voucherId") Long voucherId) {
         return iVoucherOrderService.voucher(voucherId);
     }
 
+    @ApiOperation("Redis连接测试")
     @GetMapping("/ping-redis")
     public String ping() {
         long start = System.nanoTime();

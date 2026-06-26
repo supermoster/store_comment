@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import springfox.documentation.oas.annotations.EnableOpenApi;
 
 @MapperScan("com.hmdp.mapper")
 @EnableAspectJAutoProxy(exposeProxy = true) // 暴露代理对象
