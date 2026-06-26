@@ -93,7 +93,7 @@ docker compose up -d
 
 ## API 文档
 
-启动服务后访问：`http://localhost:8080/swagger-ui.html`
+启动服务后访问：`http://localhost:8081/swagger-ui.html`
 
 ## 核心特性
 
