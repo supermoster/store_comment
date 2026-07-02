@@ -4,29 +4,15 @@ services:
   # ============ MySQL ============
   mysql:
     image: mysql:5.7
-    container_name: hmdp-mysql
+    container_name: foodiego-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: hmdp
+      MYSQL_DATABASE: foodiego
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-    # ==== 资源限制 ====
-    deploy:
-      resources:
-        limits:
-          memory: 512M      # MySQL 最多用 512M
-    # ==== MySQL 配置：限制日志 & 连接数 ====
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --max_connections=100
-      --expire_logs_days=3
-      --max_binlog_size=100M
-      --innodb_buffer_pool_size=128M
-      --innodb_log_file_size=64M
     logging:
       driver: "json-file"
       options:
@@ -41,16 +27,8 @@ services:
   # ============ Redis ============
   redis:
     image: redis:7-alpine
-    container_name: hmdp-redis
+    container_name: foodiego-redis
     restart: always
-    # ==== 关闭持久化（开发环境不需要，大幅减少磁盘 I/O）====
-    command: >
-      redis-server
-      --requirepass 123456
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      --save ""
-      --appendonly no
     ports:
       - "6379:6379"
     # ==== 资源限制 ====
@@ -72,23 +50,16 @@ services:
   # ============ RabbitMQ ============
   rabbitmq:
     image: rabbitmq:3.9-management-alpine
-    container_name: hmdp-rabbitmq
+    container_name: foodiego-rabbitmq
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: rabbitmq
       RABBITMQ_DEFAULT_PASS: rabbitmq
-      # RabbitMQ 内存上限（绝对值）
-      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: "0.4"   # 用 40% 就触发流控
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-    # ==== 资源限制 ====
-    deploy:
-      resources:
-        limits:
-          memory: 384M
     logging:
       driver: "json-file"
       options:
@@ -105,7 +76,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hmdp-app
+    container_name: foodiego-app
     restart: always
     ports:
       - "8081:8081"
@@ -123,11 +94,6 @@ services:
       RABBITMQ_PASSWORD: rabbitmq
       # 调小 JVM 堆，给系统和其他容器留更多内存
       JAVA_OPTS: "-Xms128m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
-    # ==== 资源限制 ====
-    deploy:
-      resources:
-        limits:
-          memory: 512M
     logging:
       driver: "json-file"
       options:

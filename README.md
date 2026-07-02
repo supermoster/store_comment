@@ -1,45 +1,46 @@
-﻿# hm-dianping
+# FoodieGo
 
-## 项目简介
+## Project Overview
 
-本项目是一个基于 Spring Boot 的本地生活服务平台后端系统，提供商户管理、优惠券、秒杀、用户社交等核心功能。
+FoodieGo is a local food review and flash-deal platform backend built on Spring Boot. It provides
+shop discovery, voucher flash sales (seckill), user social features, and more.
 
-## 技术栈
+## Tech Stack
 
-- **语言**: Java 8+
-- **框架**: Spring Boot 2.x
-- **数据库**: MySQL 5.7+
-- **缓存**: Redis 6.x + Redisson
-- **消息队列**: RabbitMQ
+- **Language**: Java 8+
+- **Framework**: Spring Boot 2.x
+- **Database**: MySQL 5.7+
+- **Cache**: Redis 6.x + Redisson
+- **Message Queue**: RabbitMQ
 - **ORM**: MyBatis Plus
-- **API 文档**: Swagger
+- **API Docs**: Swagger
 
-## 项目结构
+## Project Structure
 
 ```
-src/main/java/com/hmdp/
-├── HmDianPingApplication.java    # 启动类
-├── controller/                   # 控制层
-│   ├── UserController.java       # 用户管理
-│   ├── ShopController.java       # 店铺管理
-│   ├── VoucherController.java    # 优惠券管理
-│   ├── VoucherOrderController.java # 秒杀订单
-│   ├── BlogController.java       # 动态管理
-│   ├── BlogCommentsController.java # 评论管理
-│   ├── FollowController.java     # 关注功能
-│   ├── ShopTypeController.java   # 店铺类型
-│   └── UploadController.java     # 文件上传
-├── service/                      # 服务层
-├── mapper/                       # 数据访问层
-├── entity/                       # 实体类
-├── dto/                          # 数据传输对象
-├── config/                       # 配置类
-└── utils/                        # 工具类
+src/main/java/com/foodiego/
+├── FoodieGoApplication.java       # Application entry point
+├── controller/                    # REST controllers
+│   ├── UserController.java        # User management
+│   ├── ShopController.java        # Shop management
+│   ├── VoucherController.java     # Voucher management
+│   ├── VoucherOrderController.java# Flash-sale orders
+│   ├── BlogController.java        # Blog/social feed
+│   ├── BlogCommentsController.java# Comments
+│   ├── FollowController.java      # Follow/unfollow
+│   ├── ShopTypeController.java    # Shop categories
+│   └── UploadController.java      # File upload
+├── service/                       # Business service layer
+├── mapper/                        # Data access layer
+├── entity/                        # Entity classes
+├── dto/                           # Data transfer objects
+├── config/                        # Configuration classes
+└── utils/                         # Utility classes
 ```
 
-## 快速开始
+## Quick Start
 
-### 环境要求
+### Prerequisites
 
 - JDK 1.8+
 - Maven 3.6+
@@ -47,58 +48,57 @@ src/main/java/com/hmdp/
 - Redis 6.x+
 - RabbitMQ 3.8+
 
-### 配置说明
+### Configuration
 
-1. 创建数据库并执行初始化脚本：
+1. Create the database and run the init script:
 
 ```sql
-CREATE DATABASE hmdp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE foodiego CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-执行 `src/main/resources/db/hmdp.sql`
+Execute `src/main/resources/db/hmdp.sql`
 
-2. 修改 `src/main/resources/application.yaml` 中的数据库、Redis、RabbitMQ 连接配置
+2. Update database, Redis, and RabbitMQ connection settings in `src/main/resources/application.yaml`
 
-### 启动方式
+### Running the Application
 
-**开发态运行：**
+**Development mode:**
 
 ```bash
-cd hm-dianping
 mvn spring-boot:run
 ```
 
-**打包构建：**
+**Build & package:**
 
 ```bash
 mvn clean package
-java -jar target/hm-dianping-0.0.1-SNAPSHOT.jar
+java -jar target/foodiego-0.0.1-SNAPSHOT.jar
 ```
 
-**Docker 部署：**
+**Docker deployment:**
 
 ```bash
 docker compose up -d
 ```
 
-## 核心功能
+## Core Features
 
-| 模块 | 功能 | 描述 |
-|------|------|------|
-| 用户模块 | 登录/注册、用户信息管理 | 基于 Token 的无状态认证 |
-| 店铺模块 | 店铺 CRUD、分类管理 | 支持缓存优化 |
-| 优惠券模块 | 普通券/秒杀券管理 | 支持时间范围限制 |
-| 秒杀模块 | 高并发秒杀下单 | Redis + Lua 保证原子性 |
-| 社交模块 | 关注、动态、评论 | 支持滚动分页 |
+| Module | Feature | Description |
+|--------|---------|-------------|
+| User | Login/Register, Profile | Token-based stateless auth |
+| Shop | Shop CRUD, Categories | Redis cache-optimized |
+| Voucher | Regular & Flash-sale Vouchers | Time-window restrictions |
+| Seckill | High-concurrency flash sales | Redis + Lua atomicity |
+| Social | Follow, Blog, Comments | Scroll-based pagination |
 
-## API 文档
+## API Documentation
 
-启动服务后访问：`http://localhost:8081/swagger-ui.html`
+After startup, visit: `http://localhost:8081/swagger-ui.html`
 
-## 核心特性
+## Key Features
 
-- **分布式锁**: Redisson 实现，支持可重入锁、公平锁
-- **缓存策略**: Redis 缓存 + 过期时间 + 主动更新
-- **秒杀优化**: Lua 脚本保证库存原子性扣减
-- **消息队列**: RabbitMQ 异步处理订单
-- **限流降级**: Sentinel 流量控制
+- **Distributed Lock**: Redisson-based, supports reentrant & fair locks
+- **Cache Strategy**: Redis cache with TTL, logical expiration, and active invalidation
+- **Seckill Optimization**: Lua scripts ensure atomic stock deduction
+- **Message Queue**: RabbitMQ for async order processing
+- **Rate Limiting**: Sentinel flow control

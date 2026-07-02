@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: foodiego-test
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 10
+        concurrency: 1
+        max-concurrency: 2
+    publisher-confirm-type: correlated
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+  jackson:
+    default-property-inclusion: non_null
+mybatis-plus:
+  type-aliases-package: com.foodiego.entity
+logging:
+  level:
+    com.foodiego: debug
+    org.testcontainers: info

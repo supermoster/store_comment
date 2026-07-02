@@ -7,10 +7,10 @@ server:
     accept-count: 800 # TCP accept 队列深度
 spring:
   application:
-    name: hmdp
+    name: foodiego
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/hmdp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/foodiego?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:123456}
     hikari:
@@ -48,10 +48,10 @@ spring:
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
 mybatis-plus:
-  type-aliases-package: com.hmdp.entity # 别名扫描包
+  type-aliases-package: com.foodiego.entity # alias scanning package
 logging:
   level:
-    com.hmdp: info      # 关闭 DEBUG，高并发下日志 IO 是巨大瓶颈
+    com.foodiego: info      # reduce log IO under high concurrency, DEBUG disabled
     root: warn
 
 management: # 健康点检测
@@ -61,6 +61,6 @@ management: # 健康点检测
         include: health,info,metrics # 暴露健康点、应用信息、指标 http://localhost:8081/actuator/health
 info:
   app:
-    name: hmdp
+    name: foodiego
     version: 1.0.0
-    description: 本地生活服务平台
+    description: FoodieGo - Local Food Review &amp; Flash Deal Platform

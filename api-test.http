@@ -1,7 +1,7 @@
 ###############################################################################
-#  hm-dianping 接口测试文件
-#  使用方法：点每行 ### 旁边的 ▶ 播放按钮即可发送请求
-#  先在下面"用户模块"执行登录请求，拿到 token 后填入顶部 token 变量
+#  FoodieGo API Test Suite
+#  Usage: click the ▶ button next to each ### to send the request
+#  Run the login request in the "User" section first, then copy the token
 ###############################################################################
 
 # ==================== 环境变量 ====================
